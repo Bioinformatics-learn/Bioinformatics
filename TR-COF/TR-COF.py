@@ -525,18 +525,14 @@ def combineTR(TR_gain):
 
 starttime = datetime.datetime.now()
 # get params
-# bam =  '/home/tong/Real_data/real_data/19238/19238chr21_sorted.bam' #
-bam ="/media/tong/bio_HDD/suimdata/1-4/chr21tdtest1_2x_0.2_sorted.bam"
-reference = "/media/tong/bio_HDD/suimdata/chr21.fa"
-# num = int(reference.split('chr')[1].split('.')[0]) -
+bam ="test.bam"
+reference = "test.fa"
 binSize = 1000
 alpha = 0.25
 reseg_len = 50
 outfile = bam
-# outfile = "19238chr21_100_S_mq30" #sys.argv[4]
 
 # get RD&MQ
-# chrNum = 21
 chrList = get_chrlist(bam)
 chrNum = 1
 refList = [[] for i in range(22)]
