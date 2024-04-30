@@ -1,4 +1,6 @@
+#encoding: utf-8
 import sys
+
 import numpy as np
 import pysam
 import os
@@ -10,6 +12,7 @@ from pyod.models.cof import COF
 from imblearn.under_sampling import RandomUnderSampler
 
 def get_chrlist(filename):
+
     samfile = pysam.AlignmentFile(filename, "rb", ignore_truncation=True)
     List = samfile.references
     chrList = []
@@ -45,13 +48,14 @@ def get_RC(filename ,ReadCount,Mpq):
                         H_index = line.cigarstring.index('H')
                         M_index = line.cigarstring.index('M')
                         if H_index < M_index:
-                            breakpoint.append(int(line.pos))
+                            breakpoint.append(int (line.pos))
                         elif H_index > M_index:
                             breakpoint.append(int(line.pos) + int(line.qlen))
     breakpoint.append(0)
     breakpoint.append(chrLen[20]-1)
     s = sorted(list(set(breakpoint)))
-    return ReadCount, Mpq, s
+    print(s)
+    return ReadCount,Mpq,s
 
 def read_ref_file(filename, ref):
     if os.path.exists(filename):
@@ -72,6 +76,7 @@ def binning(binnum):
     for i in range(0,binnum+1):
         pos.append(i*binSize)
     return pos
+
 
 def ReadDepth(ReadCount, ref, Mapq, pos):
     # get read depth and mapping qualities
@@ -117,9 +122,12 @@ def ReadDepth(ReadCount, ref, Mapq, pos):
     bin_start = bin_start[index]
     bin_end = bin_end[index]
     bin_RD = gc_correct(bin_RD, bin_GC)
+
     return bin_start,bin_end,bin_len, bin_RD, bin_MQ, bin_gc
 
+
 def gc_correct(RD, GC):
+    # correcting gc bias
     bincount = np.bincount(GC)
     global_rd_ave = np.mean(RD)
     global_rd_median = np.median(RD)
@@ -130,7 +138,8 @@ def gc_correct(RD, GC):
         RD[i] = global_rd_median * RD[i] / mean_RD
     return RD
 
-def prox_tv1d(step_size: float, w: np.ndarray) -> np.ndarray:
+
+def prox_tv1d(step_size, w):
     """
     Computes the proximal operator of the 1-dimensional total variation operator.
 
@@ -177,14 +186,17 @@ def _prox_tv1d(step_size, input, output):
     y_low[1] = input[0] - step_size
     y_up[1] = input[0] + step_size
     incr = 1
+
     for i in range(2, width):
         y_low[i] = y_low[i-1] + input[(i - 1) * incr]
         y_up[i] = y_up[i-1] + input[(i - 1) * incr]
+
     y_low[width-1] += step_size
     y_up[width-1] -= step_size
     slope_low[0] = np.inf
     slope_up[0] = -np.inf
     z[0] = y_low[0]
+
     for i in range(1, width):
         c_low += 1
         c_up += 1
@@ -197,6 +209,7 @@ def _prox_tv1d(step_size, input, output):
                 slope_low[c_low] = (y_low[i]-y_low[index_low[c_low-1]]) / (i-index_low[c_low-1])
             else:
                 slope_low[c_low] = (y_low[i]-z[c]) / (i-index[c])
+
         slope_up[c_up] = y_up[i]-y_up[i-1]
         while (c_up > s_up+1) and (slope_up[max(c_up-1, s_up)] >= slope_up[c_up]):
             c_up -= 1
@@ -205,6 +218,7 @@ def _prox_tv1d(step_size, input, output):
                 slope_up[c_up] = (y_up[i]-y_up[index_up[c_up-1]]) / (i-index_up[c_up-1])
             else:
                 slope_up[c_up] = (y_up[i]-z[c]) / (i-index[c])
+
         while (c_low == s_low+1) and (c_up > s_up+1) and (slope_low[c_low] >= slope_up[s_up+1]):
             c += 1
             s_up += 1
@@ -219,6 +233,7 @@ def _prox_tv1d(step_size, input, output):
             z[c] = y_low[index[c]]
             index_up[s_up] = index[c]
             slope_up[c_up] = (y_up[i]-z[c]) / (i-index[c])
+
     for i in range(1, c_low - s_low + 1):
         index[c+i] = index_low[s_low+i]
         z[c+i] = y_low[index[c+i]]
@@ -233,6 +248,7 @@ def _prox_tv1d(step_size, input, output):
         i += 1
     return
 
+
 @njit
 def prox_tv1d_cols(stepsize, a, n_rows, n_cols):
     """apply prox_tv1d along columns of the matri a
@@ -243,6 +259,7 @@ def prox_tv1d_cols(stepsize, a, n_rows, n_cols):
         _prox_tv1d(stepsize, A[:, i], out[:, i])
     return out.ravel()
 
+
 @njit
 def prox_tv1d_rows(stepsize, a, n_rows, n_cols):
     """apply prox_tv1d along rows of the matri a
@@ -252,6 +269,8 @@ def prox_tv1d_rows(stepsize, a, n_rows, n_cols):
     for i in range(n_rows):
         _prox_tv1d(stepsize, A[i, :], out[i, :])
     return out.ravel()
+
+
 
 def Read_seg_file(binstart,binlen,binend,binmq):
     """
@@ -311,6 +330,7 @@ def segment_RD(RD, binStart, MQ, GC, seg_start, seg_end, length):
         seg_GC[i] = np.mean(GC[seg_start[i]:seg_end[i]+1])
         seg_start[i] = binStart[seg_start[i]] + 1
         seg_end[i] = binStart[seg_end[i]] + length[seg_end[i]]
+
     return seg_RD, seg_start, seg_end, seg_MQ, seg_GC
 
 def resegment_RD(ReadCount,Mapq,start,end):
@@ -355,12 +375,12 @@ def re_segfile(filname,savefile,reseg_length):
                                 linestrlist[3] = str(int(linestrlist[2])  + l - 1)
                                 linestrlist[4] = str(l)
                                 f2.write('\t'.join(linestrlist) + '\n')
+
                     else:
                         bin_num = length // reseg_length
                         for i in range(bin_num):
                             if i == 0:
                                 if i+1 != bin_num:
-                                # linestrlist[2] = str(int(linestrlist[2]) + i * reseg_length)
                                     linestrlist[3] = str(int(linestrlist[2]) + reseg_length - 1)
                                     linestrlist[4] = str(reseg_length)
                                 else:
@@ -377,11 +397,11 @@ def re_segfile(filname,savefile,reseg_length):
                                 linestrlist[3] = str(int(linestrlist[2]) + reseg_length - 1 + l)
                                 linestrlist[4] = str(reseg_length + l)
                                 f2.write('\t'.join(linestrlist) + '\n')
+
                 else:
                     bin_num = length // reseg_length
                     for i in range(bin_num):
                         if i==0:
-                            # linestrlist[2] = str(int(linestrlist[2]) + i * reseg_length)
                             linestrlist[3] = str(int(linestrlist[2]) + reseg_length - 1)
                             linestrlist[4] = str(reseg_length)
                             f2.write('\t'.join(linestrlist) + '\n')
@@ -399,7 +419,7 @@ def re_segfile(filname,savefile,reseg_length):
         for line in f:
             linestrinfo = line.strip().split('\t')
             tran_start.append(int(linestrinfo[2]))
-            tran_end.append(int(linestrinfo[3]) + 1)#此处+1是为了接下来的计算
+            tran_end.append(int(linestrinfo[3]) + 1)
             tran_len.append(int(linestrinfo[4]))
     tran_start = np.array(tran_start)
     tran_end = np.array(tran_end)
@@ -412,14 +432,15 @@ def get_newbins(new_data):
     new_end = np.array(new_data['end'])
     new_rd = np.array(new_data['rd'])
     new_mq = np.array(new_data['mq'])
+
     return new_chr,new_start,new_end,new_rd,new_mq
 
 def Otsu(S):
     S = np.round(S,2)
     min_S = np.min(S)
     median_S = np.median(S)
-    lower_S = np.quantile(S,0.35,interpolation='lower')
-    higer_S = np.quantile(S,0.85,interpolation='higher')
+    lower_S = np.quantile(S,0.35,method='lower')
+    higer_S = np.quantile(S,0.85,method='higher')
     if(lower_S == min_S):
         lower_S += 0.1
     final_threshold = median_S
@@ -437,6 +458,7 @@ def Otsu(S):
         new_D,new_label = RandomUnderSampler(random_state=42).fit_resample(S_resample,D_labels)
         new_D0 = new_D.ravel()[new_label==0]
         new_D1 = new_D.ravel()[new_label==1]
+
         D0_mean = np.mean(new_D0)
         D1_mean = np.mean(new_D1)
         p0 = len(D0)/(len(D0)+len(D1))
@@ -450,7 +472,7 @@ def Otsu(S):
 
 def Write_data_file(chr, start, length,  seg_count, seg_mq, scores, outfile):
     """
-    write cnvdata file
+    write TRdata file
     """
     output = open(outfile, "w")
     output.write("chr" + '\t' + "start" + '\t' + "end" + '\t' + "length" + '\t' + "read depth" + '\t' + "mapping quality" + '\t' + "score" + '\n')
@@ -459,69 +481,83 @@ def Write_data_file(chr, start, length,  seg_count, seg_mq, scores, outfile):
             str(chr[i]) + '\t' + str(start[i]) + '\t' + str(start[i] + length[i]) + '\t' + str(length[i]) +
             '\t' + str(seg_count[i]) + '\t' + str(seg_mq[i]) + '\t' + str(scores[i]) + '\n')
 
-def get_CNV(data,threshold):
-    CNVindex = data[np.round(data['scores'],2) >= threshold].index
-    Normalindex = data[np.round(data['scores'],2) < threshold].index
+def get_TR(data,threshold):
+    TRindex = data[np.round(data['scores'], 2) >= threshold].index
+    Normalindex = data[np.round(data['scores'], 2) < threshold].index
+    print("min:",data['scores'].min())
+    print("max:", data['scores'].max())
     Normalmean = (data['rd'].iloc[Normalindex]).mean()
     MQ_mean = (data['mq'].iloc[Normalindex]).mean()
     print('mean_RD:',Normalmean)
     print('mean_MQ:',MQ_mean)
     base1 = Normalmean * 0.15
-    r1 = data['rd'].iloc[CNVindex] > Normalmean + base1
-    real_CNVindex_gain = CNVindex[r1.values]
-    cnv_gain = data.iloc[real_CNVindex_gain]
-    return cnv_gain
+    r1 = data['rd'].iloc[TRindex] > Normalmean + base1
+    real_TRindex_gain = TRindex[r1.values]
+    TR_gain = data.iloc[real_TRindex_gain]
+    return TR_gain
 
-def combineCNV(CNV_gain):
-    CNVtype = np.full(CNV_gain.shape[0], 'gain')
-    CNV_gain.insert(6, 'type', CNVtype)
-    allCNV = pd.concat([ CNV_gain]).reset_index(drop=True)
-    CNV_length = allCNV['end'] - allCNV['start'] + 1
-    allCNV.insert(3, 'length', CNV_length)
-    CNVchr,CNVstart,CNVend,CNVRD,CNVmq = get_newbins(allCNV)
-    CNVlen = CNVend - CNVstart + 1
-    typeCNV = np.array(allCNV['type'])
-    for i in range(len(CNVRD) - 1):
-        if typeCNV[i] == typeCNV[i + 1]:
-            len_n = CNVstart[i + 1] - CNVend[i] - 1
-            if len_n / (CNVlen[i] + CNVlen[i + 1] + len_n) == 0:
-                CNVstart[i + 1] = CNVstart[i]
-                CNVlen[i + 1] = CNVend[i + 1] - CNVstart[i + 1] + 1
-                typeCNV[i] = 0
-    index = typeCNV != 0
-    CNVRD = CNVRD[index]
-    CNVchr = CNVchr[index]
-    CNVstart = CNVstart[index]
-    CNVend = CNVend[index]
-    CNVlen = CNVlen[index]
-    CNVmq = CNVmq[index]
-    CNVtype = typeCNV[index]
-    return CNVchr, CNVstart, CNVend, CNVlen, CNVRD, CNVmq, CNVtype
+def combineTR(TR_gain):
+    TRtype = np.full(TR_gain.shape[0], 'gain')
+    TR_gain.insert(6, 'type', TRtype)
+    allTR = pd.concat([ TR_gain]).reset_index(drop=True)
+    TR_length = allTR['end'] - allTR['start'] + 1
+    allTR.insert(3, 'length', TR_length)
+    TRchr,TRstart,TRend,TRRD,TRmq = get_newbins(allTR)
+    TRlen = TRend - TRstart + 1
+    typeTR = np.array(allTR['type'])
+    for i in range(len(TRRD) - 1):
+        if typeTR[i] == typeTR[i + 1]:
+            len_n = TRstart[i + 1] - TRend[i] - 1
+            if len_n / (TRlen[i] + TRlen[i + 1] + len_n) == 0:
+                TRstart[i + 1] = TRstart[i]
+                TRlen[i + 1] = TRend[i + 1] - TRstart[i + 1] + 1
+                typeTR[i] = 0
+
+    index = typeTR != 0
+    TRRD = TRRD[index]
+    TRchr = TRchr[index]
+    TRstart = TRstart[index]
+    TRend = TRend[index]
+    TRlen = TRlen[index]
+    TRmq = TRmq[index]
+    TRtype = typeTR[index]
+
+    return TRchr, TRstart, TRend, TRlen, TRRD, TRmq, TRtype
 
 starttime = datetime.datetime.now()
-bam = sys.argv[1]
-reference = sys.argv[2]
-binSize = 10000
+# get params
+# bam =  '/home/tong/Real_data/real_data/19238/19238chr21_sorted.bam' #
+bam ="/media/tong/bio_HDD/suimdata/1-4/chr21tdtest1_2x_0.2_sorted.bam"
+reference = "/media/tong/bio_HDD/suimdata/chr21.fa"
+# num = int(reference.split('chr')[1].split('.')[0]) -
+binSize = 1000
 alpha = 0.25
 reseg_len = 50
 outfile = bam
-chrNum = 21
+# outfile = "19238chr21_100_S_mq30" #sys.argv[4]
+
+# get RD&MQ
+# chrNum = 21
 chrList = get_chrlist(bam)
+chrNum = 1
 refList = [[] for i in range(22)]
 refList,chr_num,chr_name = read_ref_file(reference, refList)
 chrLen = np.full(22, 0)
 for i in range(22):
     chrLen[i] = len(refList[i])
-print(chrLen[20])
+    print(chrLen[i])
+# Binning
 print("Read bam file:", bam)
 ReadCount = np.full(np.max(chrLen), 0)
 Mapq = np.full(np.max(chrLen), 0)
 ReadCount,Mapq,bin_pos = get_RC(bam, ReadCount, Mapq)
+print(refList[chrNum])
 bin_start, bin_end, bin_len, bin_RD, bin_MQ, bin_gc = ReadDepth(ReadCount, refList[chrNum], Mapq, bin_pos)
-B = [*zip(bin_start,bin_end,bin_len,bin_RD)]
+B = list(zip(bin_start,bin_end,bin_len,bin_RD))
 B = pd.DataFrame(B, columns=['start', 'end', 'len', 'rd'])
 B.to_csv('B.csv',sep='\t')
 bin_MQ /= bin_RD
+
 with open('scalRD', 'w') as file:
     for c in range(len(bin_RD)):
         file.write(str(bin_RD[c]) + '\n')
@@ -533,42 +569,46 @@ res_rd = prox_tv1d(alpha, reseg_count)
 reseg_count = res_rd
 seg_chr = []
 seg_chr.extend(21 for j in range(len(reseg_count)))
-data = [*zip(seg_chr,reseg_start, reseg_end, reseg_count, reseg_mq)]
+data = list(zip(seg_chr,reseg_start, reseg_end, reseg_count, reseg_mq))
 data = pd.DataFrame(data, columns=['chr','start', 'end', 'rd', 'mq'])
+
 mapq_threshold = 20
 if (data['mq'] < mapq_threshold ).sum():
     data = data.drop(index=(data.loc[(data['mq'] < mapq_threshold )].index))
     data.index = range(data.shape[0])
-data.to_csv('data.csv',sep='\t')
 rdmq = np.array(data[['rd','mq']])
+
 reduced_data = rdmq.astype(float)
 data = reduced_data
 batch_size = 10000
 model = COF()
 cof_scores = []
+
 for i in range(0,len(data),batch_size):
     batch_data = data[i:i+batch_size]
     nan_indices = np.isnan(batch_data[:,1])
     batch_data[nan_indices,1] = 60
-    with open('batch', 'w') as file:
-        for c in range(len(batch_data)):
-            file.write(str(batch_data[c]) + '\n')
     subprocess.call('Rscript CBS_data.R ' + outfile, shell=True)
     model.fit(batch_data)
     scores = model.decision_function(batch_data)
+    with open('scores', 'w') as file:
+        for c in range(len(scores)):
+            file.write(str(scores[c]) + '\n')
     cof_scores.extend(scores)
+
 threshold = Otsu(cof_scores)
 print('final_threshold:', threshold)
-data = [*zip(seg_chr,reseg_start, reseg_end, reseg_count, reseg_mq, cof_scores)]
+data = list(zip(seg_chr,reseg_start, reseg_end, reseg_count, reseg_mq, cof_scores))
 data = pd.DataFrame(data, columns=['chr','start', 'end', 'rd', 'mq','scores'])
-CNV_gain = get_CNV(data, threshold)
-CNV_chr, CNVstart, CNVend, CNVlen, CNVRD, CNVMQ, CNVtype = combineCNV( CNV_gain)
-CNVdata = [*zip(CNVstart, CNVend, CNVlen, CNVMQ, CNVRD, CNVtype)]
-final_CNV = pd.DataFrame(CNVdata, columns=['start', 'end', 'length', 'mq', 'rd','type'])
-final_CNV = final_CNV.sort_values(by='start').drop('mq', axis=1).reset_index(drop=True)
+data.to_csv('data.csv',sep='\t')
+TR_gain = get_TR(data, threshold)
+TR_chr, TRstart, TRend, TRlen, TRRD, TRMQ, TRtype = combineTR(TR_gain)
+TRdata = list(zip(TRstart, TRend, TRlen, TRMQ, TRRD, TRtype))
+final_TR = pd.DataFrame(TRdata, columns=['start', 'end', 'length', 'mq', 'rd','type'])
+final_TR = final_TR.sort_values(by='start').drop('mq', axis=1).reset_index(drop=True)
 print('The result is:')
-print(final_CNV)
+print(final_TR)
 with open(outfile + '.result.txt', 'w', ) as Outfile:
-    final_CNV.to_string(Outfile)
+    final_TR.to_string(Outfile)
 endtime = datetime.datetime.now()
 print("running time: " + str((endtime - starttime).seconds) + " seconds")
